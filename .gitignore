@@ -1,0 +1,7 @@
+data/
+*.tif
+*.aux.xml
+.ipynb_checkpoints/
+__pycache__/
+*.geojson
+*.tfw
