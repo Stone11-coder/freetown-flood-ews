@@ -136,3 +136,17 @@ The system processes dynamic rainfall forcing alongside spatial catchment parame
 
 docker build -t freetown-flood-ews:latest .
 
+
+
+\---
+
+
+
+\## 🛡️ License \& Intellectual Property Notice
+
+\*\*Copyright © 2026 Stonison Tamba Kortu. All Rights Reserved.\*\*
+
+
+
+\*This repository represents the public operational showcase of the Freetown Flood EWS framework. Raw DEM rasters, proprietary spatial feature engineering pipelines, and live production secrets are intentionally restricted.\*
+
