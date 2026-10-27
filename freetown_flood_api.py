@@ -14,9 +14,8 @@ app = FastAPI(
 )
 
 # --- AFRICA'S TALKING CONFIGURATION ---
-# Pulls from Render environment variables, defaulting to sandbox credentials for testing
 AT_USERNAME = os.getenv("AT_USERNAME", "sandbox")
-AT_API_KEY = os.getenv("AT_API_KEY", "L5bt87NPN")  # Replace or keep your generated key here
+AT_API_KEY = os.getenv("AT_API_KEY", "L5bt87NPN")
 
 try:
     africastalking.initialize(AT_USERNAME, AT_API_KEY)
@@ -26,8 +25,7 @@ except Exception as e:
     sms_service = None
 
 # --- LOAD XGBOOST MODEL ---
-# Ensure your trained model file is in the root directory
-MODEL_PATH = "models/freetown_xgboost_flood_model_v1.pkl" # Adjust filename if slightly different
+MODEL_PATH = "models/freetown_xgboost_flood_model_v1.pkl"
 model = None
 
 try:
@@ -39,14 +37,19 @@ try:
 except Exception as e:
     print(f"Error loading model: {e}")
 
-# --- PYDANTIC SCHEMA ---
+# --- PYDANTIC SCHEMA MATCHING THE FULL FEATURE SET ---
 class SpatialTerrainPayload(BaseModel):
-    elevation: float = Field(..., description="Terrain elevation in meters")
-    slope: float = Field(..., description="Terrain slope angle")
-    rainfall: float = Field(..., description="Accumulated rainfall in mm")
-    flow_accumulation: float = Field(..., description="Upstream drainage area / flow accumulation")
-    soil_moisture: float = Field(..., description="Volumetric soil moisture index")
-    phone_number: str = Field(..., description="Recipient phone number in E.164 format (e.g., +23270000000)")
+    daily_rainfall_mm: float = Field(..., description="Daily rainfall in mm")
+    rainfall_3day_mm: float = Field(..., description="3-day cumulative rainfall in mm")
+    rainfall_7day_mm: float = Field(..., description="7-day cumulative rainfall in mm")
+    rainfall_14day_mm: float = Field(..., description="14-day cumulative rainfall in mm")
+    month_sin: float = Field(..., description="Cyclical month sine feature")
+    month_cos: float = Field(..., description="Cyclical month cosine feature")
+    elevation_mean: float = Field(..., description="Mean catchment elevation in meters")
+    slope_mean: float = Field(..., description="Mean catchment slope angle")
+    flowacc_mean: float = Field(..., description="Mean flow accumulation")
+    slope_pct_over_15deg: float = Field(..., description="Percentage of slope over 15 degrees")
+    phone_number: str = Field(..., description="Recipient phone number in E.164 format (e.g., +23278616275)")
 
 # --- ENDPOINTS ---
 @app.get("/")
@@ -63,13 +66,18 @@ def predict_spatial_terrain(payload: SpatialTerrainPayload):
     if model is None:
         raise HTTPException(status_code=500, detail="Prediction model is not loaded on the server.")
     
-    # Construct feature array matching training features
+    # Construct feature DataFrame matching the exact training columns
     input_data = pd.DataFrame([{
-        "elevation": payload.elevation,
-        "slope": payload.slope,
-        "rainfall": payload.rainfall,
-        "flow_accumulation": payload.flow_accumulation,
-        "soil_moisture": payload.soil_moisture
+        "daily_rainfall_mm": payload.daily_rainfall_mm,
+        "rainfall_3day_mm": payload.rainfall_3day_mm,
+        "rainfall_7day_mm": payload.rainfall_7day_mm,
+        "rainfall_14day_mm": payload.rainfall_14day_mm,
+        "month_sin": payload.month_sin,
+        "month_cos": payload.month_cos,
+        "elevation_mean": payload.elevation_mean,
+        "slope_mean": payload.slope_mean,
+        "flowacc_mean": payload.flowacc_mean,
+        "slope_pct_over_15deg": payload.slope_pct_over_15deg
     }])
     
     try:
