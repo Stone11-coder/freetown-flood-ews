@@ -27,7 +27,7 @@ except Exception as e:
 
 # --- LOAD XGBOOST MODEL ---
 # Ensure your trained model file is in the root directory
-MODEL_PATH = "freetown_xgboost_flood_model.pkl" # Adjust filename if slightly different
+MODEL_PATH = "models/freetown_xgboost_flood_model_v1.pkl" # Adjust filename if slightly different
 model = None
 
 try:
