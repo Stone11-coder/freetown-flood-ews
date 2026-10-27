@@ -66,7 +66,7 @@ def predict_spatial_terrain(data: SpatialTerrainInput):
     
     # Inference using XGBoost
     probability = float(model.predict_proba(input_df)[:, 1][0])
-    threshold = 0.9537  # Optimized Youden's J threshold for XGBoost
+    threshold = 0.4859  # Optimized Youden's J threshold for XGBoost  
     alert = probability >= threshold
     
     # Risk categorization
