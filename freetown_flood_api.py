@@ -1,112 +1,111 @@
 import os
-from pathlib import Path
 import joblib
+import numpy as np
 import pandas as pd
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 import africastalking
 
+# Initialize FastAPI application
 app = FastAPI(
-    title="Freetown Flood Early Warning System (EWS) - XGBoost Engine",
-    description="Real-time flash flood risk scoring engine powered by XGBoost, spatial terrain integration, and automated SMS dispatch.",
-    version="2.1.0"
+    title="Freetown Flood Early Warning System (EWS)",
+    description="XGBoost geospatial flood risk prediction engine with automated SMS dispatch.",
+    version="1.0.0"
 )
 
-# Model path
-MODEL_PATH = Path("models/freetown_xgboost_flood_model_v1.pkl")
+# --- AFRICA'S TALKING CONFIGURATION ---
+# Pulls from Render environment variables, defaulting to sandbox credentials for testing
+AT_USERNAME = os.getenv("AT_USERNAME", "sandbox")
+AT_API_KEY = os.getenv("AT_API_KEY", "L5bt87NPN")  # Replace or keep your generated key here
+
+try:
+    africastalking.initialize(AT_USERNAME, AT_API_KEY)
+    sms_service = africastalking.SMS
+except Exception as e:
+    print(f"Warning: Failed to initialize Africa's Talking SDK: {e}")
+    sms_service = None
+
+# --- LOAD XGBOOST MODEL ---
+# Ensure your trained model file is in the root directory
+MODEL_PATH = "freetown_xgboost_flood_model.pkl" # Adjust filename if slightly different
 model = None
 
-@app.on_event("startup")
-def load_model():
-    global model
-    if MODEL_PATH.exists():
-        try:
-            model = joblib.load(MODEL_PATH)
-            print("Successfully loaded Freetown XGBoost flood prediction model.")
-        except Exception as e:
-            print(f"Error loading model artifact: {e}")
+try:
+    if os.path.exists(MODEL_PATH):
+        model = joblib.load(MODEL_PATH)
+        print("Successfully loaded Freetown XGBoost flood prediction model.")
     else:
-        print(f"Warning: Model file not found at {MODEL_PATH}. Running in diagnostic mode.")
+        print(f"Warning: Model file {MODEL_PATH} not found on startup.")
+except Exception as e:
+    print(f"Error loading model: {e}")
 
-# Initialize Africa's Talking (pulls credentials securely from Render environment variables)
-AT_USERNAME = "sandbox"  
-AT_API_KEY = "atsk_aace751a0d73f567317475f21cbbfd8b2779ffabc18951df93a0b9d81dc3acb365d654f9")
-africastalking.initialize(AT_USERNAME, AT_API_KEY)
-sms = africastalking.SMS
+# --- PYDANTIC SCHEMA ---
+class SpatialTerrainPayload(BaseModel):
+    elevation: float = Field(..., description="Terrain elevation in meters")
+    slope: float = Field(..., description="Terrain slope angle")
+    rainfall: float = Field(..., description="Accumulated rainfall in mm")
+    flow_accumulation: float = Field(..., description="Upstream drainage area / flow accumulation")
+    soil_moisture: float = Field(..., description="Volumetric soil moisture index")
+    phone_number: str = Field(..., description="Recipient phone number in E.164 format (e.g., +23270000000)")
 
-# 1. UPDATED INPUT SCHEMA: Includes the phone number alongside your 10 terrain/weather features
-class SpatialTerrainInput(BaseModel):
-    daily_rainfall_mm: float = Field(..., description="Rainfall recorded in the last 24 hours (mm)")
-    rainfall_3day_mm: float = Field(..., description="Cumulative rainfall over the past 3 days (mm)")
-    rainfall_7day_mm: float = Field(..., description="Cumulative rainfall over the past 7 days (mm)")
-    rainfall_14day_mm: float = Field(..., description="Cumulative rainfall over the past 14 days (mm)")
-    month_sin: float = Field(..., description="Cyclical sine encoding for seasonality (month)")
-    month_cos: float = Field(..., description="Cyclical cosine encoding for seasonality (month)")
-    elevation_mean: float = Field(..., description="Mean elevation of the catchment (m)")
-    slope_mean: float = Field(..., description="Mean terrain slope (degrees)")
-    flowacc_mean: float = Field(..., description="Mean upslope contributing flow accumulation area")
-    slope_pct_over_15deg: float = Field(..., description="Percentage of catchment slope over 15 degrees")
-    phone_number: str = Field(..., description="Recipient phone number for emergency alerts (e.g., +23270000000)")
-
-class FloodPredictionResponse(BaseModel):
-    flood_probability: float
-    alert_triggered: bool
-    threshold_used: float
-    risk_level: str
-
+# --- ENDPOINTS ---
 @app.get("/")
-def health_check():
+def home():
     return {
-        "status": "active", 
-        "system": "Freetown Flood EWS XGBoost Engine",
-        "model_loaded": model is not None
+        "status": "online",
+        "system": "Freetown Flood EWS",
+        "threshold": 0.4859,
+        "docs_url": "/docs"
     }
 
-@app.post("/predict/spatial-terrain", response_model=FloodPredictionResponse)
-def predict_spatial_terrain(data: SpatialTerrainInput):
+@app.post("/predict/spatial-terrain")
+def predict_spatial_terrain(payload: SpatialTerrainPayload):
     if model is None:
-        raise HTTPException(
-            status_code=500, 
-            detail="Prediction model is not loaded. Ensure the XGBoost .pkl model exists in the models/ directory."
-        )
+        raise HTTPException(status_code=500, detail="Prediction model is not loaded on the server.")
     
-    # Convert incoming request to DataFrame, excluding the phone_number 
-    # (since XGBoost only needs the 10 numerical terrain/weather features)
-    input_data = data.dict()
-    phone = input_data.pop("phone_number")  # Remove phone number from model input
+    # Construct feature array matching training features
+    input_data = pd.DataFrame([{
+        "elevation": payload.elevation,
+        "slope": payload.slope,
+        "rainfall": payload.rainfall,
+        "flow_accumulation": payload.flow_accumulation,
+        "soil_moisture": payload.soil_moisture
+    }])
     
-    input_df = pd.DataFrame([input_data])
+    try:
+        # Predict flood probability
+        probabilities = model.predict_proba(input_data)
+        flood_probability = float(probabilities[0][1])  # Probability of class 1 (flood risk)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Inference error: {str(e)}")
     
-    # Inference using XGBoost with your optimized Youden's J threshold
-    probability = float(model.predict_proba(input_df)[:, 1][0])
-    threshold = 0.4859  
-    alert = probability >= threshold
+    # Optimized Youden's J decision threshold
+    THRESHOLD = 0.4859
+    is_high_risk = flood_probability >= THRESHOLD
     
-    # Risk categorization
-    if probability >= 0.98:
-        risk = "SEVERE"
-    elif probability >= threshold:
-        risk = "WARNING"
-    else:
-        risk = "NORMAL"
-        
-    # --- AUTOMATED SMS DISPATCH WORKFLOW ---
-    if alert and phone:
+    sms_status = "Not triggered (Risk below threshold)"
+    
+    # Trigger automated SMS if high risk
+    if is_high_risk:
         alert_message = (
-            f"🚨 FREETOWN FLOOD {risk} ALERT! "
-            f"Risk Probability: {probability:.1%}. "
-            f"Heavy rainfall detected in your catchment area. "
-            f"Please move to higher ground immediately."
+            f"ALERT: High flood risk detected in your catchment area "
+            f"(Probability: {flood_probability:.1%}). Please take precautionary measures."
         )
         try:
-            response = sms.send(alert_message, [phone])
-            print(f"SMS Dispatch Success: {response}")
+            if sms_service:
+                response = sms_service.send(alert_message, [payload.phone_number])
+                sms_status = f"SMS Dispatch Success: {response}"
+                print(sms_status)
+            else:
+                sms_status = "SMS service uninitialized."
         except Exception as e:
-            print(f"Failed to send SMS via Africa's Talking: {e}")
+            sms_status = f"Failed to send SMS via Africa's Talking: {str(e)}"
+            print(sms_status)
 
     return {
-        "flood_probability": round(probability, 4),
-        "alert_triggered": bool(alert),
-        "threshold_used": threshold,
-        "risk_level": risk
+        "flood_probability": flood_probability,
+        "decision_threshold": THRESHOLD,
+        "risk_status": "HIGH_RISK" if is_high_risk else "SAFE",
+        "alert_triggered": is_high_risk,
+        "sms_dispatch_result": sms_status
     }
