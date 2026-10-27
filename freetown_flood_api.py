@@ -15,7 +15,7 @@ app = FastAPI(
 
 # --- AFRICA'S TALKING CONFIGURATION ---
 AT_USERNAME = os.getenv("AT_USERNAME", "sandbox")
-AT_API_KEY =os.getenv(atsk_aace751a0d73f567317475f21cbbfd8b2779ffabc18951df93a0b9d81dc3acb365d654f9)
+AT_API_KEY = os.getenv("AT_API_KEY", "atsk_aace751a0d73f567317475f21cbbfd8b2779ffabc18951df93a0b9d81dc3act365d654f9")
 
 try:
     africastalking.initialize(AT_USERNAME, AT_API_KEY)
