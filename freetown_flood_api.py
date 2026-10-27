@@ -29,8 +29,8 @@ def load_model():
         print(f"Warning: Model file not found at {MODEL_PATH}. Running in diagnostic mode.")
 
 # Initialize Africa's Talking (pulls credentials securely from Render environment variables)
-AT_USERNAME = os.getenv("AT_USERNAME", "sandbox")
-AT_API_KEY = os.getenv("AT_API_KEY", "your_api_key")
+AT_USERNAME = "sandbox"  
+AT_API_KEY = "atsk_aace751a0d73f567317475f21cbbfd8b2779ffabc18951df93a0b9d81dc3acb365d654f9")
 africastalking.initialize(AT_USERNAME, AT_API_KEY)
 sms = africastalking.SMS
 
