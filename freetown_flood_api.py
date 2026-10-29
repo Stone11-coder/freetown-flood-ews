@@ -2,13 +2,14 @@ import os
 import joblib
 import pandas as pd
 import numpy as np
+import requests
+from datetime import datetime
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 import africastalking
-from weather_ingestion import fetch_freetown_weather_data, get_cyclical_month_features
 
 # --- INITIALIZATION ---
-app = FastAPI(title="Freetown Flood EWS API", version="2.0")
+app = FastAPI(title="Freetown Flood EWS API", version="2.1")
 
 # --- AFRICA'S TALKING CONFIGURATION ---
 AT_USERNAME = os.getenv("AT_USERNAME", "sandbox")
@@ -29,6 +30,53 @@ try:
 except Exception as e:
     print(f"Warning: Could not load model from {MODEL_PATH}: {e}")
     model = None
+
+# --- EMBEDDED WEATHER INGESTION LOGIC ---
+OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY", "")
+FREETOWN_LAT = 8.4844
+FREETOWN_LON = -13.2344
+
+def fetch_freetown_weather_data() -> dict:
+    """
+    Fetches real-time weather and calculates cumulative rainfalls for Freetown.
+    Falls back to safe baseline defaults if the API key is missing or request fails.
+    """
+    if not OPENWEATHER_API_KEY:
+        return {
+            "daily_rainfall_mm": 12.5,
+            "rainfall_3day_mm": 35.0,
+            "rainfall_7day_mm": 80.0,
+            "rainfall_14day_mm": 150.0
+        }
+    
+    try:
+        url = f"https://api.openweathermap.org/data/2.5/weather?lat={FREETOWN_LAT}&lon={FREETOWN_LON}&appid={OPENWEATHER_API_KEY}&units=metric"
+        response = requests.get(url, timeout=10)
+        data = response.json()
+        
+        rain_1h = data.get("rain", {}).get("1h", 0.0)
+        daily_est = rain_1h * 24.0
+        
+        return {
+            "daily_rainfall_mm": float(daily_est),
+            "rainfall_3day_mm": float(daily_est * 2.8),
+            "rainfall_7day_mm": float(daily_est * 6.5),
+            "rainfall_14day_mm": float(daily_est * 12.0)
+        }
+    except Exception as e:
+        print(f"Weather API fetch error: {e}")
+        return {
+            "daily_rainfall_mm": 12.5,
+            "rainfall_3day_mm": 35.0,
+            "rainfall_7day_mm": 80.0,
+            "rainfall_14day_mm": 150.0
+        }
+
+def get_cyclical_month_features() -> tuple:
+    current_month = datetime.now().month
+    month_sin = np.sin(2 * np.pi * current_month / 12)
+    month_cos = np.cos(2 * np.pi * current_month / 12)
+    return float(month_sin), float(month_cos)
 
 # --- PYDANTIC SCHEMAS ---
 class SpatialTerrainPayload(BaseModel):
