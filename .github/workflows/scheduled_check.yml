@@ -1,0 +1,17 @@
+name: Scheduled Flood Risk Monitor
+
+on:
+  schedule:
+    # Runs every 3 hours (at minute 0 of hours 0, 3, 6, 9, 12, 15, 18, 21 UTC)
+    - cron: '0 */3 * * *'
+  workflow_dispatch: # Allows manual triggers from GitHub UI for testing
+
+jobs:
+  run-auto-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Render EWS Auto-Check Endpoint
+        run: |
+          curl -X POST "https://freetown-flood-ews.onrender.com/predict/auto-check" \
+               -H "Content-Type: application/json" \
+               -d '{"phone_number": "${{ secrets.ALERT_PHONE_NUMBER }}"}'
