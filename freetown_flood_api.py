@@ -12,9 +12,8 @@ import africastalking
 app = FastAPI(title="Freetown Flood EWS API", version="2.1")
 
 # --- AFRICA'S TALKING CONFIGURATION ---
-AT_USERNAME = os.getenv("AT_USERNAME", "sandbox")
-AT_API_KEY = os.getenv("AT_API_KEY", "your_sandbox_api_key_here")
-
+AT_USERNAME = "sandbox"
+AT_API_KEY = "atsk_97cff8882e20add5d931f28c8188bc5808fa3ed26c14cd41e76f7d5ded63b6a74e5c1e72"
 try:
     africastalking.initialize(AT_USERNAME, AT_API_KEY)
     sms_service = africastalking.SMS
