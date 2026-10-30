@@ -71,7 +71,7 @@ input_data = pd.DataFrame([{
 # Perform Live Prediction in Sidebar
 if model is not None:
     prob = float(model.predict_proba(input_data)[:, 1][0])
-    threshold = 0.9537
+    threshold = 0.4859
     
     if prob >= 0.98:
         risk_label = "SEVERE"
