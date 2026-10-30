@@ -221,3 +221,13 @@ def predict_auto_check(payload: AutoCheckPayload):
         "alert_triggered": is_high_risk,
         "sms_dispatch_result": sms_status
     }
+@app.post("/test-sms")
+def test_sms_dispatch(payload: dict):
+    target_phone = payload.get("phone_number", "+23278616275")
+    message = "ALERT TEST: Freetown Early Warning System active. High risk detected."
+    
+    try:
+        response = sms.send(message, [target_phone])
+        return {"status": "SUCCESS", "sms_response": response}
+    except Exception as e:
+        return {"status": "ERROR", "error_message": str(e)}
