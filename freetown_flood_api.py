@@ -99,10 +99,25 @@ class AutoCheckPayload(BaseModel):
     slope_pct_over_15deg: float = Field(25.5, description="Percentage of slope over 15 degrees")
 
 # --- API ENDPOINTS ---
+# ... FastAPI app initialization (app = FastAPI(...)) and other routes ...
+
+@app.get("/")
+def read_root():
+    return {"message": "Freetown Flood Early Warning System API is running"}
+
+# Add the health check endpoint right here:
+@app.get("/health")
+def health_check():
+    return {
+        "status": "healthy",
+        "service": "Freetown Flood Early Warning System",
+        "version": "1.0.0"
+    }
+
+# ... your @app.post("/predict") endpoint and other logic below ...
 @app.get("/")
 def home():
     return {"status": "Freetown Flood EWS API is running live."}
-
 @app.post("/predict/spatial-terrain")
 def predict_spatial_terrain(payload: SpatialTerrainPayload):
     if model is None:
