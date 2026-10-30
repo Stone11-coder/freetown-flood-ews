@@ -227,7 +227,14 @@ def test_sms_dispatch(payload: dict):
     message = "ALERT TEST: Freetown Early Warning System active. High risk detected."
     
     try:
-        response = sms.send(message, [target_phone])
+        import os
+        import africastalking
+        username = os.getenv("AT_USERNAME", "sandbox")
+        api_key = os.getenv("AT_API_KEY", "")
+        africastalking.initialize(username, api_key)
+        sms_client = africastalking.SMS
+        
+        response = sms_client.send(message, [target_phone])
         return {"status": "SUCCESS", "sms_response": response}
     except Exception as e:
         return {"status": "ERROR", "error_message": str(e)}
