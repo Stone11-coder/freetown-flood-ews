@@ -3,8 +3,8 @@ import requests
 import datetime
 import numpy as np
 
-# OpenWeatherMap Configuration
-OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY", "your_openweather_api_key_here")
+# OpenWeatherMap Configuration (loaded strictly from environment variable)
+OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
 FREETOWN_LAT = 8.4844
 FREETOWN_LON = -13.2344
 
